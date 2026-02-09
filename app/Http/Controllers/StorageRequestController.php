@@ -64,55 +64,48 @@ class StorageRequestController extends Controller
 
     /**
      * Approve or reject a storage request (for admins).
-     */
-    public function action(Request $request, $id)
-    {
-        $request->validate([
-            'action' => 'required|in:approve,reject',
-        ]);
+     */public function action(Request $request, $id)
+{
+    // 1. التحقق من البيانات
+    $request->validate([
+        'action' => 'required|in:approve,reject',
+    ]);
 
-        // Ensure user is admin
-        if ($request->user()->role !== 'admin') {
-            return response()->json([
-                'message' => 'Unauthorized. Admin access required.'
-            ], 403);
-        }
-
-        $storageRequest = StorageRequest::findOrFail($id);
-
-        if ($storageRequest->status !== 'pending') {
-            return response()->json([
-                'message' => 'This request has already been processed'
-            ], 400);
-        }
-
-        DB::beginTransaction();
-        try {
-            $storageRequest->status = $request->action === 'approve' ? 'approved' : 'rejected';
-            $storageRequest->admin_id = $request->user()->id;
-            $storageRequest->save();
-
-            if ($request->action === 'approve') {
-                // Extract numeric value from plan (e.g., "100MB" -> 100)
-                $planValue = (int) str_replace('MB', '', $storageRequest->requested_plan);
-                
-                // Update user's storage limit
-                $user = User::findOrFail($storageRequest->user_id);
-                $user->storage_limit = $planValue;
-                $user->save();
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'storage_request' => $storageRequest,
-                'message' => 'Storage request ' . $request->action . 'd successfully'
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'message' => 'Failed to process storage request'
-            ], 500);
-        }
+    // 2. التحقق من الصلاحيات (بما أنها صفحة Web، يفضل استخدام middleware 'auth' و 'admin')
+    if ($request->user()->role !== 'admin') {
+        abort(403, 'Unauthorized. Admin access required.');
     }
+
+    $storageRequest = StorageRequest::findOrFail($id);
+
+    // 3. التحقق من حالة الطلب
+    if ($storageRequest->status !== 'pending') {
+        return back()->with('error', 'This request has already been processed');
+    }
+
+    DB::beginTransaction();
+    try {
+        $storageRequest->status = $request->action === 'approve' ? 'approved' : 'rejected';
+        $storageRequest->admin_id = $request->user()->id;
+        $storageRequest->save();
+
+        if ($request->action === 'approve') {
+            // استخراج الرقم من الخطة (مثلاً "100MB" تصبح 100)
+            $planValue = (int) str_replace('MB', '', $storageRequest->requested_plan);
+            
+            $user = User::findOrFail($storageRequest->user_id);
+            $user->storage_limit = $planValue;
+            $user->save();
+        }
+
+        DB::commit();
+
+        // الرد لصفحة Blade
+        return back()->with('success', 'Storage request ' . $request->action . 'ed successfully');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->with('error', 'Failed to process request: ' . $e->getMessage());
+    }
+}
 }

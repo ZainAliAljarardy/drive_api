@@ -4,59 +4,91 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use App\http\Controllers\AuthController;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Auth;
+
 
 class AdminController extends Controller
 {
+    
     /**
      * Get all users with their plans and block status (for admins).
      */
     public function users(Request $request)
-    {
-        // 1. التأكد من أن المستخدم الحالي هو أدمن
-        if ($request->user()->role !== 'admin') {
-            return response()->json([
-                'message' => 'Unauthorized. Admin access required.'
-            ], 403);
-        }
-
-        // 2. تعديل الاستعلام لجلب المستخدمين العاديين فقط
-        $users = User::where('role', 'user') // إضافة هذا السطر فقط
-            ->withCount('files')
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        return response()->json([
-            'users' => $users
-        ]);
+{
+    if ($request->user()->role !== 'admin') {
+        abort(403, 'Unauthorized. Admin access required.');
     }
+
+    $users = User::where('role', 'user')
+        ->withCount('files')
+        ->orderBy('created_at', 'desc')
+        ->get();
+
+    $pendingRequests = \App\Models\StorageRequest::with('user')
+        ->where('status', 'pending')
+        ->get();
+
+    return view('admin.dashboard', compact('users', 'pendingRequests'));
+}
 
     /**
      * Toggle block status of a user (for admins).
      */
-    public function toggleBlock(Request $request, $id)
-    {
-        // Ensure user is admin
-        if ($request->user()->role !== 'admin') {
-            return response()->json([
-                'message' => 'Unauthorized. Admin access required.'
-            ], 403);
+   public function toggleBlock(Request $request, $id)
+{
+    // 1. التأكد من الصلاحيات (اختياري إذا كان هناك Middleware)
+    if ($request->user()->role !== 'admin') {
+        return abort(403, 'Unauthorized action.');
+    }
+
+    $user = User::findOrFail($id);
+
+    if ($user->id === $request->user()->id) {
+        return back()->with('error', 'You cannot block yourself!');
+    }
+
+    $user->is_blocked = !$user->is_blocked;
+    $user->save();
+
+    $statusMessage = $user->is_blocked ? 'User has been blocked.' : 'User has been unblocked.';
+    
+    return back()->with('success', $statusMessage);
+}
+
+    /**
+     * Refresh user data from API
+     */
+   public function refresh()
+{
+    try {
+        $user = \App\Models\User::find(auth()->id());
+
+        if ($user) {
+            $user->loadCount('files'); 
+            session(['user' => $user->toArray()]);
+            return back()->with('success', 'تم تحديث البيانات بنجاح');
         }
 
-        $user = User::findOrFail($id);
+        return back()->with('error', 'User not found');
 
-        // Prevent admin from blocking themselves
-        if ($user->id === $request->user()->id) {
-            return response()->json([
-                'message' => 'You cannot block yourself'
-            ], 400);
-        }
-
-        $user->is_blocked = !$user->is_blocked;
-        $user->save();
-
-        return response()->json([
-            'user' => $user,
-            'message' => 'User ' . ($user->is_blocked ? 'blocked' : 'unblocked') . ' successfully'
-        ]);
+    } catch (\Exception $e) {
+        return back()->withErrors(['error' => 'Refresh failed: ' . $e->getMessage()]);
     }
 }
+
+/**
+     * Logout
+     */
+    public function logout()
+    {
+        session()->forget('access_token');
+        Session::flush();
+        return redirect()->route('login');
+    }
+
+
+}
+
+   

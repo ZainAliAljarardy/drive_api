@@ -17,6 +17,7 @@ Route::post('/admin/login', [AuthController::class, 'adminLogin']);
 Route::middleware('auth:sanctum')->group(function () {
     // File routes with block status and storage limit checks
     Route::get('/files', [FileController::class, 'index']);
+    Route::get('/profile', [AuthController::class, 'getProfile']);
     Route::post('/files', [FileController::class, 'store'])
         ->middleware([CheckBlockStatus::class, CheckStorageLimit::class]);
     Route::get('/files/{id}/download', [FileController::class, 'download']);

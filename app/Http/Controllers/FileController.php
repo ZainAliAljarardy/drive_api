@@ -22,13 +22,36 @@ class FileController extends Controller
         ]);
     }
 
+//     public function index(Request $request)
+// {
+//     $files = File::where('user_id', $request->user()->id)
+//         ->orderBy('created_at', 'desc')
+//         ->get();
+
+//     return response()->json([
+//         'files' => $files->map(function($file) {
+//             return [
+//                 'id' => $file->id,
+//                 'user_id' => $file->user_id,
+//                 'name' => $file->name,
+//                 'path' => $file->path,
+//                 'size' => $file->size,
+//                 'extension' => $file->extension,
+//                 // تحويل التاريخ إلى صيغة ISO 8601 القياسية
+//                 'created_at' => $file->created_at->toIso8601String(),
+//                 'updated_at' => $file->updated_at->toIso8601String(),
+//             ];
+//         })
+//     ]);
+// }
+
     /**
      * Upload a new file.
      */
     public function store(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|max:512000', // Max 500MB in KB (for 500MB plan)
+            'file' => 'required|file|max:5120000000', // Max 500MB in KB (for 500MB plan)
         ]);
 
         $user = $request->user();
@@ -67,20 +90,53 @@ class FileController extends Controller
     /**
      * Download a file.
      */
+    // public function download(Request $request, $id)
+    // {
+    //     $file = File::where('id', $id)
+    //         ->where('user_id', $request->user()->id)
+    //         ->firstOrFail();
+
+    //     if (!Storage::disk('public')->exists($file->path)) {
+    //         return response()->json([
+    //             'message' => 'File not found'
+    //         ], 404);
+    //     }
+
+    //     return Storage::disk('public')->download($file->path, $file->name);
+    // }
+    //   moving to streaming way 
     public function download(Request $request, $id)
-    {
-        $file = File::where('id', $id)
-            ->where('user_id', $request->user()->id)
-            ->firstOrFail();
+{
+    $file = File::where('id', $id)
+        ->where('user_id', $request->user()->id)
+        ->firstOrFail();
 
-        if (!Storage::disk('public')->exists($file->path)) {
-            return response()->json([
-                'message' => 'File not found'
-            ], 404);
-        }
-
-        return Storage::disk('public')->download($file->path, $file->name);
+    // التأكد من وجود الملف فعلياً في التخزين
+    if (!Storage::disk('public')->exists($file->path)) {
+        return response()->json([
+            'message' => 'File not found'
+        ], 404);
     }
+
+    $path = Storage::disk('public')->path($file->path);
+    $fileSize = Storage::disk('public')->size($file->path);
+    $mimeType = Storage::disk('public')->mimeType($file->path);
+
+    // استخدام streamDownload لإرسال الملف كأجزاء (Chunks)
+    return response()->streamDownload(function () use ($path) {
+        $stream = fopen($path, 'rb');
+        // قراءة وإرسال الملف كقطع صغيرة (8 كيلوبايت في المرة)
+        while (!feof($stream)) {
+            echo fread($stream, 8192);
+            flush(); // تفريغ الذاكرة وإرسال الجزء فوراً للمستخدم
+        }
+        fclose($stream);
+    }, $file->name, [
+        'Content-Type' => $mimeType,
+        'Content-Length' => $fileSize, // ضروري جداً ليظهر شريط التقدم في فلاتر والويب
+        'Content-Disposition' => 'attachment; filename="' . $file->name . '"',
+    ]);
+}
 
     /**
      * Delete a file.

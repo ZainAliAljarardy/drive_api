@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -75,33 +76,67 @@ class AuthController extends Controller
     /**
      * Login for admins.
      */
-    public function adminLogin(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
+  public function adminLogin(Request $request)
+{
+    // Validate input
+    $credentials = $request->validate([
+        'email' => 'required|email',
+        'password' => 'required',
+    ]);
 
-        $user = User::where('email', $request->email)->first();
+    // Attempt login
+    if (Auth::attempt($credentials)) {
+        // Regenerate session to prevent fixation
+        $request->session()->regenerate();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
+        $user = Auth::user();
+
+        // Check admin role
+        if ($user->role === 'admin') {
+            // Store user in session
+            $request->session()->put('user', [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
             ]);
+
+            // Optional: only if you actually have api_token
+            if (!empty($user->api_token)) {
+                $request->session()->put('api_token', $user->api_token);
+            }
+
+            return redirect()->route('admin.dashboard')->with('success', 'Welcome to Dashboard');
         }
 
-        if ($user->role !== 'admin') {
-            return response()->json([
-                'message' => 'Unauthorized. This endpoint is for admins only.'
-            ], 403);
-        }
+        // Not admin—logout and error
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'user' => $user,
-            'token' => $token,
-            'message' => 'Login successful'
+        return back()->withErrors([
+            'email' => 'Unauthorized. This area is for admins only.',
         ]);
     }
+
+    // Invalid credentials
+    throw ValidationException::withMessages([
+        'email' => ['The provided credentials are incorrect.'],
+    ]);
+}
+
+public function getProfile(Request $request)
+{
+    // 1. جلب المستخدم الحالي من التوكن
+    $user = $request->user();
+
+    // 2. إعادة تحميل البيانات من الداتابيز لضمان جلب آخر التحديثات 
+    // (مثل الحظر، تغيير المساحة، أو تغيير الاسم)
+    $freshUser = \App\Models\User::findOrFail($user->id);
+
+    return response()->json([
+        'status' => 'success',
+        'user' => $freshUser
+    ]);
+}
 }
