@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Admin Login')
+@section('title', 'Admin Registration')
 
 @section('content')
 <div class="row justify-content-center align-items-center" style="min-height: 100vh; background: linear-gradient(135deg, #1f1c2c, #928dab);">
@@ -8,13 +8,25 @@
         <div class="card shadow-lg border-0" style="border-radius: 12px;">
             <div class="card-body p-5" style="background-color: #2c2c54; color: #fff; border-radius: 12px;">
                 <div class="text-center mb-4">
-                    <i class="bi bi-shield-lock" style="font-size: 4rem; color: #f9ca24;"></i>
-                    <h2 class="mt-3">Admin Login</h2>
-                    <p class="text-muted" style="color: #dcdde1 !important;">Administrator access only</p>
+                    <i class="bi bi-person-plus" style="font-size: 4rem; color: #f9ca24;"></i>
+                    <h2 class="mt-3">Create Admin Account</h2>
+                    <p class="text-muted" style="color: #dcdde1 !important;">Fill in the details to register a new admin</p>
                 </div>
 
-                <form method="POST" action="{{ route('admin.login') }}">
+                <form method="POST" action="{{ route('admin.register.submit') }}">
                     @csrf
+                    
+                    <div class="mb-3">
+                        <label for="name" class="form-label text-light">
+                            <i class="bi bi-person"></i> Full Name
+                        </label>
+                        <input type="text" class="form-control bg-dark text-light border-0 @error('name') is-invalid @enderror" 
+                               id="name" name="name" value="{{ old('name') }}" required autofocus>
+                        @error('name')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
                     <div class="mb-3">
                         <label for="email" class="form-label text-light">
                             <i class="bi bi-envelope"></i> Email Address
@@ -37,21 +49,21 @@
                         @enderror
                     </div>
 
-                    @if($errors->has('error'))
-                        <div class="alert alert-danger">
-                            <i class="bi bi-exclamation-triangle"></i> {{ $errors->first('error') }}
-                        </div>
-                    @endif
+                    <div class="mb-4">
+                        <label for="password_confirmation" class="form-label text-light">
+                            <i class="bi bi-shield-check"></i> Confirm Password
+                        </label>
+                        <input type="password" class="form-control bg-dark text-light border-0" 
+                               id="password_confirmation" name="password_confirmation" required>
+                    </div>
 
                     <button type="submit" class="btn btn-warning w-100 mb-3" style="font-weight: bold;">
-                        <i class="bi bi-box-arrow-in-right"></i> Login as Admin
+                        <i class="bi bi-person-check"></i> Register Admin
                     </button>
-                    <div class="text-center mt-2">
-    <p class="mb-1 text-muted" style="font-size: 0.9rem;">Need a new admin account?</p>
-    <a href="{{ route('admin.register') }}" class="btn btn-outline-warning w-100" style="font-weight: 500;">
-        <i class="bi bi-person-plus"></i> Create New Admin Account
-    </a>
-</div>
+                    
+                    <div class="text-center">
+                        <a href="{{ route('login') }}" class="text-decoration-none" style="color: #f9ca24;">Already have an account? Login</a>
+                    </div>
                 </form>
             </div>
         </div>

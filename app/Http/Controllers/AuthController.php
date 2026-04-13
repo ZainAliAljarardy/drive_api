@@ -10,6 +10,33 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+
+/**
+ * Handle Admin Registration logic.
+ */
+public function adminRegister(Request $request)
+{
+    // 1. التحقق من البيانات
+    $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|string|email|max:255|unique:users',
+        'password' => 'required|string|min:8|confirmed', // تأكد من وجود حقل password_confirmation في الـ Blade
+    ]);
+
+    // 2. إنشاء الأدمن
+    $admin = \App\Models\User::create([
+        'name' => $request->name,
+        'email' => $request->email,
+        'password' => \Illuminate\Support\Facades\Hash::make($request->password),
+        'role' => 'admin', // تعيين الرتبة كأدمن تلقائياً
+        'storage_limit' => 10000, // مثلاً الأدمن يحصل على مساحة أكبر افتراضياً
+        'used_storage' => 0,
+        'is_blocked' => false,
+    ]);
+
+    return redirect()->route('login')->with('success', 'Admin account created successfully. Please login.');
+}
+
     /**
      * Register a new user.
      */

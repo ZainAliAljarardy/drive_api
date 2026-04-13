@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             $table->enum('role', ['admin', 'user'])->default('user')->after('password');
-            $table->decimal('storage_limit', 10, 2)->default(10)->after('role')->comment('Storage limit in MB');
+            $table->decimal('storage_limit', 10, 2)->nullable()->default(10)->after('role')->comment('Storage limit in MB');
             $table->decimal('used_storage', 10, 2)->default(0)->after('storage_limit')->comment('Used storage in MB');
             $table->boolean('is_blocked')->default(false)->after('used_storage');
         });

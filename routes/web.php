@@ -12,6 +12,12 @@ Route::get('/', function () {
 
 Route::post('/admin/login', [AuthController::class, 'adminLogin'])->name('admin.login');
 
+// مسارات إنشاء حساب أدمن جديد
+Route::get('/admin/register', function () {
+    return view('auth.admin-register');
+})->name('admin.register');
+
+Route::post('/admin/register', [AuthController::class, 'adminRegister'])->name('admin.register.submit');
 
 // --- مسارات تحتاج حماية (يجب تسجيل الدخول كأدمن) ---
 Route::middleware(['auth'])->group(function () {
