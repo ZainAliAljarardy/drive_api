@@ -19,8 +19,8 @@ FROM node:22-alpine AS frontend
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json ./
+RUN npm install
 
 COPY . .
 RUN npm run build
@@ -65,6 +65,10 @@ RUN { \
 
 COPY --from=vendor /app /var/www/html
 COPY --from=frontend /app/public/build /var/www/html/public/build
+
+RUN cp .env.example .env \
+    && php artisan key:generate --force \
+    && php artisan migrate --force
 
 RUN mkdir -p \
         storage/framework/cache \
